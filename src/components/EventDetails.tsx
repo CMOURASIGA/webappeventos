@@ -31,13 +31,15 @@ import { useTasks } from "../hooks/useTasks";
 import { useBudgetItems } from "../hooks/useBudgetItems";
 import { useProfiles } from "../hooks/useProfiles";
 import { useAuth } from "../contexts/AuthContext";
+import { useDepartments } from "../hooks/useDepartments";
 
 interface EventDetailsProps {
   eventId: string;
   onBack: () => void;
+  onEdit: (eventId: string) => void;
 }
 
-export default function EventDetails({ eventId, onBack }: EventDetailsProps) {
+export default function EventDetails({ eventId, onBack, onEdit }: EventDetailsProps) {
   const [activeTab, setActiveTab] = useState<"geral" | "tarefas" | "orcamento" | "historico">("geral");
   const [showAddTask, setShowAddTask] = useState(false);
   const [evento, setEvento] = useState<Event | null>(null);
@@ -49,6 +51,7 @@ export default function EventDetails({ eventId, onBack }: EventDetailsProps) {
     refresh: refreshOrcamento,
   } = useBudgetItems(eventId);
   const { profiles } = useProfiles();
+  const { departments } = useDepartments();
   const { profile } = useAuth();
   const [creatingTask, setCreatingTask] = useState(false);
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
@@ -78,6 +81,14 @@ export default function EventDetails({ eventId, onBack }: EventDetailsProps) {
     });
     return map;
   }, [profiles]);
+
+  const departmentsMap = useMemo(() => {
+    const map = new Map<string, string>();
+    departments.forEach((department) => {
+      map.set(department.id, department.nome);
+    });
+    return map;
+  }, [departments]);
 
 useEffect(() => {
   const fetchEvent = async () => {
@@ -301,7 +312,10 @@ const updateEventStatus = async (newStatus: EventStatus, silent = false) => {
             <p className="text-gray-600">{evento.tipo}</p>
           </div>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+        <button
+          onClick={() => onEdit(evento.id)}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
           <Edit2 className="w-4 h-4" />
           Editar Evento
         </button>
@@ -482,7 +496,11 @@ const updateEventStatus = async (newStatus: EventStatus, silent = false) => {
 
                 <div>
                   <label className="block text-sm text-gray-600 mb-2">Departamento</label>
-                  <p className="text-gray-900">{evento.departamento_id ?? "Não definido"}</p>
+                  <p className="text-gray-900">
+                    {evento.departamento_id
+                      ? departmentsMap.get(evento.departamento_id) ?? "Nao identificado"
+                      : "Nao definido"}
+                  </p>
                 </div>
               </div>
 

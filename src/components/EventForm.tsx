@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, Save, X } from "lucide-react";
-import { EventStatus, EventPriority } from "../types";
+import { EventStatus, EventPriority, Event } from "../types";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { useDepartments } from "../hooks/useDepartments";
 
 interface EventFormProps {
   onBack: () => void;
+  eventId?: string;
 }
 
 const tiposEvento = [
@@ -22,9 +23,10 @@ const tiposEvento = [
   "Outros",
 ];
 
-export default function EventForm({ onBack }: EventFormProps) {
+export default function EventForm({ onBack, eventId }: EventFormProps) {
   const { profile, userTeams, teamsLoading } = useAuth();
   const { departments, refresh: reloadDepartments } = useDepartments();
+  const isEditing = Boolean(eventId);
   const [formData, setFormData] = useState({
     titulo: "",
     descricao: "",
@@ -43,6 +45,44 @@ export default function EventForm({ onBack }: EventFormProps) {
   const [showNewDepartment, setShowNewDepartment] = useState(false);
   const [newDepartment, setNewDepartment] = useState({ nome: "", sigla: "" });
   const [creatingDepartment, setCreatingDepartment] = useState(false);
+  const [loadingEvent, setLoadingEvent] = useState(Boolean(eventId));
+
+  useEffect(() => {
+    if (!eventId) {
+      setLoadingEvent(false);
+      return;
+    }
+    const fetchEvent = async () => {
+      setLoadingEvent(true);
+      const { data, error } = await supabase
+        .from<Event>("eventos")
+        .select("*")
+        .eq("id", eventId)
+        .single();
+      if (error || !data) {
+        alert("Nao foi possivel carregar os dados do evento.");
+        setLoadingEvent(false);
+        onBack();
+        return;
+      }
+      setFormData({
+        titulo: data.titulo ?? "",
+        descricao: data.descricao ?? "",
+        tipo: data.tipo ?? "Congresso",
+        data_inicio: data.data_inicio?.slice(0, 10) ?? "",
+        data_fim: data.data_fim?.slice(0, 10) ?? "",
+        local: data.local ?? "",
+        status: data.status ?? "input",
+        prioridade: data.prioridade ?? "media",
+        departamento: data.departamento_id ?? "",
+        participantes_esperados: data.participantes_esperados?.toString() ?? "",
+        observacoes: data.observacoes ?? "",
+      });
+      setSelectedTeamId(data.equipe_id ?? "");
+      setLoadingEvent(false);
+    };
+    fetchEvent();
+  }, [eventId, onBack]);
 
   useEffect(() => {
     if (!selectedTeamId && userTeams.length > 0) {
@@ -63,50 +103,59 @@ export default function EventForm({ onBack }: EventFormProps) {
 
     try {
       setSaving(true);
-      const { data: insertedEvent, error } = await supabase
-        .from("eventos")
-        .insert([
-          {
-            titulo: formData.titulo,
-            descricao: formData.descricao,
-            tipo: formData.tipo,
-            data_inicio: formData.data_inicio,
-            data_fim: formData.data_fim,
-            local: formData.local,
-            status: formData.status,
-            prioridade: formData.prioridade,
-            departamento_id: formData.departamento || null,
-            equipe_id: selectedTeamId,
-            responsavel_id: profile.id,
-            solicitante_id: profile.id,
-            participantes_esperados: formData.participantes_esperados
-              ? Number(formData.participantes_esperados)
-              : null,
-            observacoes: formData.observacoes,
-          },
-        ])
-        .select("*")
-        .single();
-      if (error) throw error;
+      const payloadBase = {
+        titulo: formData.titulo,
+        descricao: formData.descricao,
+        tipo: formData.tipo,
+        data_inicio: formData.data_inicio,
+        data_fim: formData.data_fim,
+        local: formData.local,
+        status: formData.status,
+        prioridade: formData.prioridade,
+        departamento_id: formData.departamento || null,
+        equipe_id: selectedTeamId,
+        participantes_esperados: formData.participantes_esperados
+          ? Number(formData.participantes_esperados)
+          : null,
+        observacoes: formData.observacoes,
+      };
 
-      if (insertedEvent?.id) {
-        const { error: approvalError } = await supabase.from("aprovacoes").insert([
-          {
-            evento_id: insertedEvent.id,
-            tipo: "evento",
-            status: "pendente",
-            solicitante_id: profile.id,
-            equipe_id: selectedTeamId,
-            observacoes: "Aguardando avaliação do evento recém-cadastrado.",
-          },
-        ]);
-        if (approvalError) throw approvalError;
+      if (isEditing && eventId) {
+        const { error } = await supabase.from("eventos").update(payloadBase).eq("id", eventId);
+        if (error) throw error;
+        alert("Evento atualizado com sucesso!");
+      } else {
+        const insertPayload = {
+          ...payloadBase,
+          responsavel_id: profile.id,
+          solicitante_id: profile.id,
+        };
+        const { data: insertedEvent, error } = await supabase
+          .from("eventos")
+          .insert([insertPayload])
+          .select("*")
+          .single();
+        if (error) throw error;
+
+        if (insertedEvent?.id) {
+          const { error: approvalError } = await supabase.from("aprovacoes").insert([
+            {
+              evento_id: insertedEvent.id,
+              tipo: "evento",
+              status: "pendente",
+              solicitante_id: profile.id,
+              equipe_id: selectedTeamId,
+              observacoes: "Aguardando avaliacao do evento recem-cadastrado.",
+            },
+          ]);
+          if (approvalError) throw approvalError;
+        }
+        alert("Evento cadastrado e enviado para aprovacao!");
       }
 
-      alert("Evento cadastrado e enviado para aprovação!");
       onBack();
     } catch (err) {
-      alert("Erro ao salvar evento ou iniciar aprovação. Tente novamente.");
+      alert("Erro ao salvar evento. Tente novamente.");
     } finally {
       setSaving(false);
     }
@@ -153,10 +202,10 @@ export default function EventForm({ onBack }: EventFormProps) {
     }
   };
 
-  if (teamsLoading) {
+  if (teamsLoading || loadingEvent) {
     return (
       <div className="p-6 text-gray-500">
-        Carregando equipes disponíveis...
+        Carregando dados do formulario...
       </div>
     );
   }
@@ -191,8 +240,10 @@ export default function EventForm({ onBack }: EventFormProps) {
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div>
-          <h2 className="text-gray-900">Novo Evento</h2>
-          <p className="text-gray-600">Preencha as informações do evento</p>
+          <h2 className="text-gray-900">{isEditing ? "Editar Evento" : "Novo Evento"}</h2>
+          <p className="text-gray-600">
+            {isEditing ? "Atualize as informacoes do evento" : "Preencha as informacoes do evento"}
+          </p>
         </div>
       </div>
 
@@ -424,7 +475,7 @@ export default function EventForm({ onBack }: EventFormProps) {
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60"
           >
             <Save className="w-4 h-4" />
-            {saving ? "Salvando..." : "Cadastrar Evento"}
+            {saving ? "Salvando..." : isEditing ? "Salvar Alteracoes" : "Cadastrar Evento"}
           </button>
         </div>
       </form>

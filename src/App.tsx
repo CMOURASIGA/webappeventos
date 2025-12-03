@@ -38,6 +38,11 @@ export default function App() {
     setSelectedEventId(null);
   };
 
+  const handleEditEvent = (eventId: string) => {
+    setSelectedEventId(eventId);
+    setActiveView("editar-evento");
+  };
+
   const renderContent = () => {
     switch (activeView) {
       case "dashboard":
@@ -46,11 +51,18 @@ export default function App() {
         return <EventsList onViewChange={handleViewChange} />;
       case "novo-evento":
         return <EventForm onBack={handleBackToList} />;
+      case "editar-evento":
+        return selectedEventId ? (
+          <EventForm eventId={selectedEventId} onBack={handleBackToList} />
+        ) : (
+          <EventsList onViewChange={handleViewChange} />
+        );
       case "evento-detalhes":
         return selectedEventId ? (
           <EventDetails
             eventId={selectedEventId}
             onBack={handleBackToList}
+            onEdit={handleEditEvent}
           />
         ) : (
           <EventsList onViewChange={handleViewChange} />
