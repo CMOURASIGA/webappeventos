@@ -11,7 +11,7 @@ Aplicação web para coordenar todas as etapas do ciclo de vida de eventos corpo
 ## Futuro Próximo
 - Disponibilizar um backend completo no Supabase, com tabelas para eventos, tarefas, itens de orçamento, aprovações e usuários.
 - Expor APIs e policies para automatizar mudanças de status e notificações.
-- Persistir as operações hoje simuladas com `mockData`.
+- Substituir completamente os mocks por leituras/escritas no Supabase.
 
 ## Stack Atual
 - **Frontend**: React 18 + Vite + Tailwind

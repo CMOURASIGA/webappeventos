@@ -8,6 +8,7 @@ import {
   Settings,
   HelpCircle
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 interface SidebarProps {
   activeView: string;
@@ -15,14 +16,16 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ activeView, onViewChange }: SidebarProps) {
-  const menuItems = [
+  const { isAdmin, canAccessApprovals } = useAuth();
+  const baseItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'eventos', label: 'Eventos', icon: Calendar },
     { id: 'tarefas', label: 'Tarefas', icon: ListChecks },
     { id: 'orcamentos', label: 'Orçamentos', icon: FileText },
-    { id: 'aprovacoes', label: 'Aprovações', icon: CheckSquare },
+    canAccessApprovals ? { id: 'aprovacoes', label: 'Aprovações', icon: CheckSquare } : null,
     { id: 'relatorios', label: 'Relatórios', icon: BarChart3 }
   ];
+  const menuItems = baseItems.filter(Boolean) as { id: string; label: string; icon: any }[];
 
   return (
     <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-screen">
@@ -56,10 +59,15 @@ export default function Sidebar({ activeView, onViewChange }: SidebarProps) {
       </nav>
 
       <div className="p-4 border-t border-gray-200">
-        <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
-          <Settings className="w-5 h-5" />
-          <span>Configurações</span>
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => onViewChange('configuracoes')}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <Settings className="w-5 h-5" />
+            <span>Configurações</span>
+          </button>
+        )}
         <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
           <HelpCircle className="w-5 h-5" />
           <span>Ajuda</span>

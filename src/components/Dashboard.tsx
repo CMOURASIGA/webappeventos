@@ -1,54 +1,79 @@
-import { Calendar, Clock, DollarSign, TrendingUp, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { mockEvents, mockTasks, mockApprovals } from '../data/mockData';
-import { getStatusLabel, getStatusColor, formatDate, getDaysUntil } from '../utils/helpers';
+import { Calendar, Clock, DollarSign, AlertCircle } from "lucide-react";
+import {
+  getStatusLabel,
+  getStatusColor,
+  formatDate,
+  getDaysUntil,
+  formatCurrency,
+  calculateBudgetItemTotal,
+} from "../utils/helpers";
+import { useEvents } from "../hooks/useEvents";
+import { useTasks } from "../hooks/useTasks";
+import { useApprovals } from "../hooks/useApprovals";
+import { useBudgetItems } from "../hooks/useBudgetItems";
 
 interface DashboardProps {
   onViewChange: (view: string, eventId?: string) => void;
 }
 
 export default function Dashboard({ onViewChange }: DashboardProps) {
-  const proximosEventos = mockEvents
-    .filter(e => getDaysUntil(e.data_inicio) >= 0)
-    .sort((a, b) => new Date(a.data_inicio).getTime() - new Date(b.data_inicio).getTime())
+  const { events, loading: eventsLoading } = useEvents();
+  const { tasks } = useTasks();
+  const { approvals } = useApprovals();
+  const { items: budgetItems } = useBudgetItems();
+
+  const proximosEventos = events
+    .filter((e) => getDaysUntil(e.data_inicio) >= 0)
+    .sort(
+      (a, b) =>
+        new Date(a.data_inicio).getTime() - new Date(b.data_inicio).getTime(),
+    )
     .slice(0, 5);
 
-  const tarefasPendentes = mockTasks.filter(t => t.status !== 'concluida' && t.status !== 'cancelada');
-  const aprovacoesAguardando = mockApprovals.filter(a => a.status === 'pendente');
-  
-  const eventosEmExecucao = mockEvents.filter(e => e.status === 'execucao').length;
-  const orcamentoTotal = mockEvents
-    .filter(e => e.orcamento_aprovado)
-    .reduce((sum, e) => sum + (e.orcamento_aprovado || 0), 0);
+  const tarefasPendentes = tasks.filter(
+    (t) => t.status !== "concluida" && t.status !== "cancelada",
+  );
+  const aprovacoesAguardando = approvals.filter(
+    (a) => a.status === "pendente",
+  );
+
+  const eventosEmExecucao = events.filter((e) => e.status === "execucao").length;
+  const orcamentoTotal = budgetItems.reduce(
+    (sum, item) => sum + calculateBudgetItemTotal(item),
+    0,
+  );
 
   const stats = [
     {
-      label: 'Eventos Ativos',
-      value: mockEvents.filter(e => e.status !== 'pos_evento' && e.status !== 'cancelado').length.toString(),
+      label: "Eventos Ativos",
+      value: events
+        .filter((e) => e.status !== "pos_evento" && e.status !== "cancelado")
+        .length.toString(),
       icon: Calendar,
-      color: 'bg-blue-500',
-      trend: '+2 este mês'
+      color: "bg-blue-500",
+      trend: `${events.length} no total`,
     },
     {
-      label: 'Em Execução',
+      label: "Em Execução",
       value: eventosEmExecucao.toString(),
       icon: Clock,
-      color: 'bg-green-500',
-      trend: 'Em andamento'
+      color: "bg-green-500",
+      trend: "Em andamento",
     },
     {
-      label: 'Tarefas Pendentes',
+      label: "Tarefas Pendentes",
       value: tarefasPendentes.length.toString(),
       icon: AlertCircle,
-      color: 'bg-orange-500',
-      trend: `${tarefasPendentes.filter(t => getDaysUntil(t.prazo) < 3).length} urgentes`
+      color: "bg-orange-500",
+      trend: `${tarefasPendentes.filter((t) => getDaysUntil(t.prazo) < 3).length} urgentes`,
     },
     {
-      label: 'Orçamento Total',
-      value: `R$ ${(orcamentoTotal / 1000).toFixed(0)}k`,
+      label: "Orçamento Total",
+      value: formatCurrency(orcamentoTotal),
       icon: DollarSign,
-      color: 'bg-purple-500',
-      trend: 'Aprovado'
-    }
+      color: "bg-purple-500",
+      trend: `${budgetItems.length} itens`,
+    },
   ];
 
   return (
@@ -90,6 +115,9 @@ export default function Dashboard({ onViewChange }: DashboardProps) {
             </button>
           </div>
           <div className="space-y-3">
+            {!eventsLoading && proximosEventos.length === 0 && (
+              <p className="text-sm text-gray-500">Nenhum evento futuro registrado.</p>
+            )}
             {proximosEventos.map((evento) => {
               const diasRestantes = getDaysUntil(evento.data_inicio);
               return (
@@ -168,8 +196,8 @@ export default function Dashboard({ onViewChange }: DashboardProps) {
               </button>
             </div>
             <div className="space-y-3">
-              {aprovacoesAguardando.map((aprovacao) => {
-                const evento = mockEvents.find(e => e.id === aprovacao.evento_id);
+            {aprovacoesAguardando.map((aprovacao) => {
+                const evento = events.find(e => e.id === aprovacao.evento_id);
                 return (
                   <div key={aprovacao.id} className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors">
                     <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -195,7 +223,7 @@ export default function Dashboard({ onViewChange }: DashboardProps) {
         <div className="relative">
           <div className="absolute left-4 top-0 bottom-0 w-px bg-gray-200"></div>
           <div className="space-y-6">
-            {mockEvents
+            {events
               .filter(e => e.status !== 'cancelado')
               .sort((a, b) => new Date(a.data_inicio).getTime() - new Date(b.data_inicio).getTime())
               .slice(0, 6)

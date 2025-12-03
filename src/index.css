@@ -1609,3 +1609,33 @@ html {
   syntax: "*";
   inherits: false
 }
+
+@media print {
+  body {
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .print-hide {
+    display: none !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .print-section,
+  .print-section * {
+    visibility: visible;
+  }
+
+  .print-section {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    box-shadow: none !important;
+    border: 1px solid #d1d5db;
+    page-break-inside: avoid;
+  }
+}

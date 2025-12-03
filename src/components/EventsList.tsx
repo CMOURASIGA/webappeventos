@@ -1,25 +1,86 @@
-import { useState } from 'react';
-import { Plus, Filter, Calendar, MapPin, Users, DollarSign, Eye } from 'lucide-react';
-import { mockEvents } from '../data/mockData';
-import { Event, EventStatus, EventPriority } from '../types';
-import { getStatusLabel, getStatusColor, getPriorityLabel, getPriorityColor, formatDate, formatCurrency } from '../utils/helpers';
+import { useMemo, useState } from "react";
+import {
+  Plus,
+  Filter,
+  Calendar,
+  MapPin,
+  DollarSign,
+  Eye,
+  Trash2,
+} from "lucide-react";
+import { Event, EventStatus, EventPriority } from "../types";
+import {
+  getStatusLabel,
+  getStatusColor,
+  getPriorityLabel,
+  getPriorityColor,
+  formatDate,
+  formatCurrency,
+} from "../utils/helpers";
+import { useEvents } from "../hooks/useEvents";
+import { useProfiles } from "../hooks/useProfiles";
+import { supabase } from "../lib/supabaseClient";
 
 interface EventsListProps {
   onViewChange: (view: string, eventId?: string) => void;
 }
 
 export default function EventsList({ onViewChange }: EventsListProps) {
-  const [filterStatus, setFilterStatus] = useState<EventStatus | 'todos'>('todos');
-  const [filterPriority, setFilterPriority] = useState<EventPriority | 'todos'>('todos');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<EventStatus | "todos">(
+    "todos",
+  );
+  const [filterPriority, setFilterPriority] = useState<EventPriority | "todos">(
+    "todos",
+  );
+  const [searchTerm, setSearchTerm] = useState("");
+  const { events, loading, refresh } = useEvents();
+  const { profiles } = useProfiles();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const filteredEvents = mockEvents.filter(event => {
-    const matchStatus = filterStatus === 'todos' || event.status === filterStatus;
-    const matchPriority = filterPriority === 'todos' || event.prioridade === filterPriority;
-    const matchSearch = event.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                       event.local.toLowerCase().includes(searchTerm.toLowerCase());
+  const profilesMap = useMemo(() => {
+    const map = new Map<string, string>();
+    profiles.forEach((profile) => {
+      if (profile.id) {
+        map.set(profile.id, profile.nome ?? profile.email);
+      }
+    });
+    return map;
+  }, [profiles]);
+
+  const filteredEvents = events.filter((event) => {
+    const matchStatus = filterStatus === "todos" || event.status === filterStatus;
+    const matchPriority =
+      filterPriority === "todos" || event.prioridade === filterPriority;
+    const matchSearch =
+      event.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      event.local.toLowerCase().includes(searchTerm.toLowerCase());
     return matchStatus && matchPriority && matchSearch;
   });
+
+  const handleDelete = async (event: Event) => {
+    const confirmed = window.confirm(
+      `Deseja realmente excluir o evento "${event.titulo}"? Esta ação não pode ser desfeita.`,
+    );
+    if (!confirmed) return;
+    try {
+      setDeletingId(event.id);
+      const { error } = await supabase.from("eventos").delete().eq("id", event.id);
+      if (error) throw error;
+      await refresh();
+    } catch (err) {
+      alert("Erro ao excluir evento. Tente novamente.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        <p className="text-gray-500">Carregando eventos...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -127,7 +188,11 @@ export default function EventsList({ onViewChange }: EventsListProps) {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <p className="text-sm text-gray-600">{event.responsavel}</p>
+                    <p className="text-sm text-gray-600">
+                      {event.responsavel_id
+                        ? profilesMap.get(event.responsavel_id) ?? "Responsável não identificado"
+                        : "Não definido"}
+                    </p>
                   </td>
                   <td className="px-6 py-4">
                     {event.orcamento_aprovado ? (
@@ -152,6 +217,14 @@ export default function EventsList({ onViewChange }: EventsListProps) {
                       >
                         <Eye className="w-4 h-4" />
                       </button>
+                      <button
+                        onClick={() => handleDelete(event)}
+                        disabled={deletingId === event.id}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-60"
+                        title="Excluir evento"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -160,7 +233,7 @@ export default function EventsList({ onViewChange }: EventsListProps) {
           </table>
         </div>
 
-        {filteredEvents.length === 0 && (
+        {!loading && filteredEvents.length === 0 && (
           <div className="text-center py-12">
             <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-500">Nenhum evento encontrado</p>
@@ -169,7 +242,9 @@ export default function EventsList({ onViewChange }: EventsListProps) {
       </div>
 
       <div className="flex items-center justify-between text-sm text-gray-600">
-        <p>Mostrando {filteredEvents.length} de {mockEvents.length} eventos</p>
+        <p>
+          Mostrando {filteredEvents.length} de {events.length} eventos
+        </p>
       </div>
     </div>
   );

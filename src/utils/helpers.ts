@@ -7,11 +7,19 @@ export const formatCurrency = (value: number): string => {
   }).format(value);
 };
 
+const parseLocalDate = (date: string): Date => {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const [year, month, day] = date.split("-").map(Number);
+    return new Date(year, month - 1, day);
+  }
+  return new Date(date);
+};
+
 export const formatDate = (date: string): string => {
-  return new Date(date).toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
+  return parseLocalDate(date).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
   });
 };
 
@@ -99,4 +107,68 @@ export const getDaysUntil = (date: string): number => {
 
 export const isOverdue = (date: string): boolean => {
   return getDaysUntil(date) < 0;
+};
+
+export const getLocalTodayISO = (): string => {
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return new Date().toLocaleDateString("en-CA", {
+    timeZone,
+  });
+};
+
+export const normalizeDateInput = (value: string): string | null => {
+  const trimmed = value.trim();
+  const isoPattern = /^\d{4}-\d{2}-\d{2}$/;
+
+  if (isoPattern.test(trimmed)) {
+    return trimmed;
+  }
+
+  if (/^\d{8}$/.test(trimmed)) {
+    const tryBuild = (year: string, month: string, day: string) => {
+      const parsed = new Date(Number(year), Number(month) - 1, Number(day));
+      const isValid =
+        parsed.getFullYear() === Number(year) &&
+        parsed.getMonth() === Number(month) - 1 &&
+        parsed.getDate() === Number(day);
+      return isValid ? `${year}-${month}-${day}` : null;
+    };
+
+    const ddmmFirst = tryBuild(
+      trimmed.slice(4, 8),
+      trimmed.slice(2, 4),
+      trimmed.slice(0, 2)
+    );
+    if (ddmmFirst) {
+      return ddmmFirst;
+    }
+
+    const yyyymm = tryBuild(
+      trimmed.slice(0, 4),
+      trimmed.slice(4, 6),
+      trimmed.slice(6, 8)
+    );
+    if (yyyymm) {
+      return yyyymm;
+    }
+  }
+
+  return null;
+};
+
+export const calculateBudgetItemTotal = (item: {
+  valor_total?: number | null;
+  quantidade?: number | null;
+  valor_unitario?: number | null;
+}): number => {
+  const stored = Number(item.valor_total);
+  if (!Number.isNaN(stored) && item.valor_total !== null && item.valor_total !== undefined) {
+    return stored;
+  }
+  const qty = Number(item.quantidade ?? 0);
+  const unit = Number(item.valor_unitario ?? 0);
+  if (Number.isNaN(qty) || Number.isNaN(unit)) {
+    return 0;
+  }
+  return qty * unit;
 };
