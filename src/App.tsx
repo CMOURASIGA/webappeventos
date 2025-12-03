@@ -16,9 +16,8 @@ import { useAuth } from "./contexts/AuthContext";
 export default function App() {
   const { user, loading, profileLoading, teamsLoading, isAdmin, canAccessApprovals } = useAuth();
   const [activeView, setActiveView] = useState("dashboard");
-  const [selectedEventId, setSelectedEventId] = useState<
-    string | null
-  >(null);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleViewChange = (view: string, eventId?: string) => {
     if (view === "configuracoes" && !isAdmin) {
@@ -104,15 +103,17 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-gray-50">
       <Sidebar
         activeView={activeView}
         onViewChange={handleViewChange}
+        isMobileOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
       />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto">
-          {renderContent()}
+      <div className="flex-1 flex flex-col min-h-screen">
+        <Header onToggleSidebar={() => setSidebarOpen(true)} />
+        <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-6">
+          <div className="max-w-7xl mx-auto">{renderContent()}</div>
         </main>
       </div>
     </div>
