@@ -11,10 +11,13 @@ import ReportsView from "./components/ReportsView";
 import TeamManager from "./components/TeamManager";
 import Login from "./components/Login";
 import BudgetManager from "./components/BudgetManager";
+import MobileApp from "./components/mobile/MobileApp";
 import { useAuth } from "./contexts/AuthContext";
+import { useBreakpoint } from "./hooks/useBreakpoint";
 
 export default function App() {
   const { user, loading, profileLoading, teamsLoading, isAdmin, canAccessApprovals } = useAuth();
+  const { isMobile } = useBreakpoint();
   const [activeView, setActiveView] = useState("dashboard");
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -100,6 +103,10 @@ export default function App() {
 
   if (!user) {
     return <Login />;
+  }
+
+  if (isMobile) {
+    return <MobileApp />;
   }
 
   return (
