@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState, memo } from "react";
-import { Calendar, MapPin, Users, DollarSign, CheckCircle2, Edit3, ClipboardList, Inbox, Clock, AlertCircle } from "lucide-react";
-import type { Event, TaskStatus, EventStatus } from "../../types";
+import { Calendar, MapPin, Users, DollarSign, CheckCircle2, Edit3, ClipboardList, TrendingUp } from "lucide-react";
+import type { Event, TaskStatus } from "../../types";
 import { supabase } from "../../lib/supabaseClient";
 import { useTasks } from "../../hooks/useTasks";
 import { useBudgetItems } from "../../hooks/useBudgetItems";
-import { useProfiles } from "../../hooks/useProfiles";
 import { formatDate, getPriorityLabel, getStatusLabel, calculateBudgetItemTotal, formatCurrency } from "../../utils/helpers";
 
 interface MobileEventDetailsProps {
@@ -12,310 +11,120 @@ interface MobileEventDetailsProps {
   onEdit: (eventId: string) => void;
 }
 
-const InfoCard = memo(({ icon: Icon, label, value, color = "text-gray-600" }: any) => (
-  <div className="flex items-center gap-3 p-3 rounded-2xl bg-gray-50 border border-gray-100">
-    <div className={`w-10 h-10 rounded-xl bg-white flex items-center justify-center flex-shrink-0 shadow-sm`}>
-      <Icon className={`w-5 h-5 ${color}`} />
+const DetailBlock = ({ title, icon: Icon, children, count }: any) => (
+  <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 mb-4">
+    <div className="flex items-center justify-between mb-4">
+      <h3 className="font-bold text-slate-900 flex items-center gap-2">
+        <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600"><Icon className="w-4 h-4" /></div>
+        {title}
+      </h3>
+      {count !== undefined && <span className="text-xs font-bold bg-gray-100 text-gray-600 px-2 py-1 rounded-full">{count}</span>}
     </div>
-    <div className="flex-1 min-w-0">
-      <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">{label}</p>
-      <p className="text-sm text-gray-900 font-semibold truncate">{value}</p>
-    </div>
+    {children}
   </div>
-));
-
-InfoCard.displayName = "InfoCard";
-
-const TaskCard = memo(({ task, onStatusChange, updating }: any) => (
-  <li className="border border-gray-100 rounded-xl p-3 bg-white">
-    <div className="flex items-center justify-between gap-3">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-gray-900 mb-1">{task.titulo}</p>
-        <p className="text-xs text-gray-500">
-          Entrega em {formatDate(task.prazo)}
-          {task.data_conclusao && ` • Concluída em ${formatDate(task.data_conclusao)}`}
-        </p>
-      </div>
-      <select
-        value={task.status}
-        onChange={(e) => onStatusChange(task.id, e.target.value as TaskStatus)}
-        disabled={updating}
-        className="text-xs bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 touch-manipulation"
-      >
-        <option value="pendente">Pendente</option>
-        <option value="em_andamento">Em andamento</option>
-        <option value="concluida">Concluída</option>
-        <option value="cancelada">Cancelada</option>
-      </select>
-    </div>
-  </li>
-));
-
-TaskCard.displayName = "TaskCard";
-
-const BudgetItem = memo(({ item }: any) => (
-  <li className="flex items-center justify-between text-sm p-3 rounded-xl bg-gray-50 border border-gray-100">
-    <div className="flex-1 min-w-0">
-      <p className="text-gray-900 font-semibold truncate">{item.descricao}</p>
-      <div className="flex items-center gap-2 mt-1">
-        <p className="text-xs text-gray-500">{item.categoria}</p>
-        {item.fornecedor && (
-          <>
-            <span className="text-gray-300">•</span>
-            <p className="text-xs text-gray-500 truncate">{item.fornecedor}</p>
-          </>
-        )}
-      </div>
-    </div>
-    <span className="text-gray-900 font-bold ml-3 flex-shrink-0">
-      {formatCurrency(calculateBudgetItemTotal(item))}
-    </span>
-  </li>
-));
-
-BudgetItem.displayName = "BudgetItem";
-
-const FlowStep = memo(({ status, current, label }: any) => {
-  const active = status === current || status === "pos_evento";
-  return (
-    <div className="flex items-center gap-3 text-sm">
-      <div
-        className={`w-6 h-6 rounded-full flex items-center justify-center border-2 transition-all ${
-          active ? "bg-blue-600 border-blue-600 text-white scale-110" : "bg-white border-gray-200 text-gray-300"
-        }`}
-      >
-        <CheckCircle2 className="w-3.5 h-3.5" />
-      </div>
-      <span className={`${active ? "text-gray-900 font-semibold" : "text-gray-500"} truncate`}>{label}</span>
-    </div>
-  );
-});
-
-FlowStep.displayName = "FlowStep";
+);
 
 function MobileEventDetails({ eventId, onEdit }: MobileEventDetailsProps) {
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
-  const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
-  
   const { tasks, refresh: refreshTasks } = useTasks(eventId);
   const { items: budgetItems } = useBudgetItems(eventId);
-  const { profiles } = useProfiles();
 
   useEffect(() => {
-    const fetchEvent = async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from<Event>("eventos")
-        .select("*")
-        .eq("id", eventId)
-        .single();
-      if (!error && data) {
-        setEvent(data);
-      }
-      setLoading(false);
-    };
-    fetchEvent();
+    supabase.from<Event>("eventos").select("*").eq("id", eventId).single().then(({ data }) => {
+       if(data) setEvent(data);
+       setLoading(false);
+    });
   }, [eventId]);
 
-  const profilesMap = useMemo(() => {
-    const map = new Map<string, string>();
-    profiles.forEach((profile) => map.set(profile.id, profile.nome ?? profile.email));
-    return map;
-  }, [profiles]);
+  const totalBudget = useMemo(() => budgetItems.reduce((sum, item) => sum + calculateBudgetItemTotal(item), 0), [budgetItems]);
 
-  const totalBudget = useMemo(
-    () => budgetItems.reduce((sum, item) => sum + calculateBudgetItemTotal(item), 0),
-    [budgetItems]
-  );
-
-  const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
-    try {
-      setUpdatingTaskId(taskId);
-      const updates: Record<string, any> = { status };
-      
-      if (status === "concluida") {
-        updates.data_conclusao = new Date().toISOString().split("T")[0];
-      } else {
-        updates.data_conclusao = null;
-      }
-
-      const { error } = await supabase.from("tarefas").update(updates).eq("id", taskId);
-      if (error) throw error;
-      await refreshTasks();
-    } catch (err) {
-      alert("Erro ao atualizar tarefa.");
-    } finally {
-      setUpdatingTaskId(null);
-    }
+  const handleTaskToggle = async (taskId: string, currentStatus: TaskStatus) => {
+    const newStatus = currentStatus === 'concluida' ? 'pendente' : 'concluida';
+    await supabase.from("tarefas").update({ status: newStatus, data_conclusao: newStatus === 'concluida' ? new Date() : null }).eq("id", taskId);
+    refreshTasks();
   };
 
-  if (loading) {
-    return (
-      <div className="text-center py-12">
-        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-        <p className="text-sm text-gray-500">Carregando detalhes...</p>
-      </div>
-    );
-  }
-
-  if (!event) {
-    return (
-      <div className="text-center py-12">
-        <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-        <p className="text-sm text-gray-500">Evento não encontrado.</p>
-      </div>
-    );
-  }
-
-  const flowSteps: { status: EventStatus; label: string }[] = [
-    { status: "input", label: "Input do Evento" },
-    { status: "criacao_tarefas", label: "Criação de Tarefas" },
-    { status: "geracao_orcamento", label: "Geração de Orçamento" },
-    { status: "aguardando_aprovacao", label: "Aguardando Aprovação" },
-    { status: "execucao", label: "Em Execução" },
-    { status: "pos_evento", label: "Pós-Evento" },
-  ];
+  if (loading || !event) return <div className="text-center py-20 text-slate-400">Carregando...</div>;
 
   return (
-    <div className="space-y-4 pb-4">
-      {/* Hero Section com gradiente */}
-      <section className="rounded-3xl overflow-hidden shadow-lg border border-white/30 bg-gradient-to-br from-indigo-500 via-blue-500 to-sky-500 text-white">
-        <div className="p-5 space-y-4">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex-1 min-w-0">
-              <p className="text-[11px] uppercase tracking-wide text-white/70 font-bold mb-1">{event.tipo}</p>
-              <h2 className="text-2xl font-bold leading-snug mb-2">{event.titulo}</h2>
-              <p className="text-sm text-white/80 leading-relaxed">{event.descricao}</p>
-            </div>
-            <button
-              onClick={() => onEdit(event.id)}
-              className="bg-white/20 hover:bg-white/30 text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1 font-bold active:scale-95 transition-all flex-shrink-0 touch-manipulation"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-              Editar
+    <div className="pb-8">
+      {/* Hero Section */}
+      <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-blue-600 to-indigo-700 text-white p-6 shadow-xl shadow-blue-900/20 mb-6">
+         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl pointer-events-none" />
+         
+         <div className="flex justify-between items-start mb-4 relative z-10">
+            <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-lg text-xs font-bold uppercase tracking-wider border border-white/10">
+               {event.tipo}
+            </span>
+            <button onClick={() => onEdit(event.id)} className="p-2 bg-white/20 rounded-full active:bg-white/30 transition-colors">
+               <Edit3 className="w-4 h-4" />
             </button>
-          </div>
-          
-          <div className="text-sm text-white/80 space-y-2">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 flex-shrink-0" />
-              <span className="truncate">{formatDate(event.data_inicio)} - {formatDate(event.data_fim)}</span>
+         </div>
+
+         <h2 className="text-2xl font-bold leading-tight mb-2 relative z-10">{event.titulo}</h2>
+         <p className="text-blue-100 text-sm mb-6 leading-relaxed opacity-90 relative z-10">{event.descricao}</p>
+
+         <div className="grid grid-cols-2 gap-3 relative z-10">
+            <div className="bg-blue-800/30 backdrop-blur-sm p-3 rounded-xl border border-white/10">
+               <Calendar className="w-4 h-4 mb-1 text-blue-200" />
+               <p className="text-xs text-blue-200">Início</p>
+               <p className="font-semibold text-sm">{formatDate(event.data_inicio)}</p>
             </div>
-            <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 flex-shrink-0" />
-              <span className="truncate">{event.local}</span>
+            <div className="bg-blue-800/30 backdrop-blur-sm p-3 rounded-xl border border-white/10">
+               <MapPin className="w-4 h-4 mb-1 text-blue-200" />
+               <p className="text-xs text-blue-200">Local</p>
+               <p className="font-semibold text-sm truncate">{event.local}</p>
             </div>
-            {event.participantes_esperados && (
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 flex-shrink-0" />
-                <span>{event.participantes_esperados} participantes</span>
-              </div>
-            )}
-          </div>
-        </div>
-        
-        <div className="flex items-center justify-between px-5 py-3 bg-black/10 text-xs font-bold">
-          <span className="px-3 py-1 rounded-full bg-white/20">{getStatusLabel(event.status)}</span>
-          <span className="px-3 py-1 rounded-full bg-white/20">{getPriorityLabel(event.prioridade)}</span>
-        </div>
-      </section>
+         </div>
+      </div>
 
-      {/* Participantes */}
-      <section className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-        <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-          <Users className="w-4 h-4 text-blue-500" />
-          Participantes
-        </h3>
-        <div className="space-y-3">
-          <InfoCard
-            icon={Users}
-            label="Responsável"
-            value={event.responsavel_id ? profilesMap.get(event.responsavel_id) || "Não identificado" : "Não definido"}
-            color="text-blue-500"
-          />
-          <InfoCard
-            icon={Users}
-            label="Solicitante"
-            value={event.solicitante_id ? profilesMap.get(event.solicitante_id) || "Não identificado" : "Não definido"}
-            color="text-purple-500"
-          />
-        </div>
-      </section>
+      {/* Progress Bar Simplificada */}
+      <div className="mb-6 px-2">
+         <div className="flex justify-between text-xs font-bold text-slate-500 mb-2">
+            <span>Progresso</span>
+            <span>{getStatusLabel(event.status)}</span>
+         </div>
+         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div className="h-full bg-blue-500 rounded-full w-1/3" /> {/* Lógica de progresso real pode ser injetada aqui */}
+         </div>
+      </div>
 
-      {/* Tarefas */}
-      <section className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-            <ClipboardList className="w-4 h-4 text-green-500" />
-            Tarefas
-          </h3>
-          <span className="text-xs text-gray-400 font-medium">{tasks.length} itens</span>
-        </div>
-        
-        {tasks.length === 0 ? (
-          <div className="text-center py-6 text-sm text-gray-500 flex flex-col items-center gap-2">
-            <ClipboardList className="w-10 h-10 text-gray-300" />
-            <p>Nenhuma tarefa cadastrada.</p>
-          </div>
-        ) : (
-          <ul className="space-y-2">
-            {tasks.map((task) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                onStatusChange={handleTaskStatusChange}
-                updating={updatingTaskId === task.id}
-              />
+      {/* Tasks Block */}
+      <DetailBlock title="Tarefas" icon={ClipboardList} count={tasks.length}>
+         {tasks.length === 0 ? <p className="text-sm text-gray-400 py-2">Sem tarefas.</p> : (
+            <div className="space-y-3">
+               {tasks.slice(0, 5).map(task => (
+                  <div key={task.id} onClick={() => handleTaskToggle(task.id, task.status)} className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 active:bg-gray-100 transition-colors cursor-pointer touch-manipulation">
+                     <div className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${task.status === 'concluida' ? 'bg-green-500 border-green-500' : 'border-gray-300'}`}>
+                        {task.status === 'concluida' && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+                     </div>
+                     <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-medium ${task.status === 'concluida' ? 'text-gray-400 line-through' : 'text-slate-900'}`}>{task.titulo}</p>
+                        <p className="text-xs text-gray-500">{formatDate(task.prazo)}</p>
+                     </div>
+                  </div>
+               ))}
+            </div>
+         )}
+      </DetailBlock>
+
+      {/* Budget Block */}
+      <DetailBlock title="Orçamento" icon={DollarSign}>
+         <div className="flex items-center justify-between p-4 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border border-emerald-100 mb-3">
+            <span className="text-sm font-medium text-emerald-800">Total Previsto</span>
+            <span className="text-lg font-bold text-emerald-700">{formatCurrency(totalBudget)}</span>
+         </div>
+         <div className="space-y-2">
+            {budgetItems.slice(0, 3).map(item => (
+               <div key={item.id} className="flex justify-between text-sm py-2 border-b border-gray-50 last:border-0">
+                  <span className="text-slate-600 truncate pr-4">{item.descricao}</span>
+                  <span className="font-semibold text-slate-900">{formatCurrency(calculateBudgetItemTotal(item))}</span>
+               </div>
             ))}
-          </ul>
-        )}
-      </section>
-
-      {/* Orçamento */}
-      <section className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-            <DollarSign className="w-4 h-4 text-purple-500" />
-            Orçamento
-          </h3>
-          <span className="text-xs flex items-center gap-1 text-purple-600 font-bold bg-purple-50 px-2 py-1 rounded-lg">
-            <DollarSign className="w-4 h-4" />
-            {formatCurrency(totalBudget)}
-          </span>
-        </div>
-        
-        {budgetItems.length === 0 ? (
-          <div className="text-center py-6 text-sm text-gray-500 flex flex-col items-center gap-2">
-            <Inbox className="w-10 h-10 text-gray-300" />
-            <p>Nenhum item cadastrado.</p>
-          </div>
-        ) : (
-          <ul className="space-y-2">
-            {budgetItems.map((item) => (
-              <BudgetItem key={item.id} item={item} />
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {/* Fluxo do evento */}
-      <section className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-        <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-blue-500" />
-          Fluxo do evento
-        </h3>
-        <div className="space-y-2">
-          {flowSteps.map((step) => (
-            <FlowStep
-              key={step.status}
-              status={step.status}
-              current={event.status}
-              label={step.label}
-            />
-          ))}
-        </div>
-      </section>
+            {budgetItems.length > 3 && <p className="text-xs text-center text-blue-500 font-bold mt-2">Ver todos os itens</p>}
+         </div>
+      </DetailBlock>
     </div>
   );
 }
