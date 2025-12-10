@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Clock, Loader2, X, Inbox, ShieldCheck } from "lucide-react";
+import { Check, Loader2, X, Inbox, ShieldCheck, Clock, Calendar } from "lucide-react";
 import { useApprovals } from "../../hooks/useApprovals";
 import { useEvents } from "../../hooks/useEvents";
 import { supabase } from "../../lib/supabaseClient";
@@ -17,104 +17,98 @@ export default function MobileApprovals() {
     setUpdatingId(null);
   };
 
-  if (loading) {
-    return (
-      <div className="text-center py-12">
-        <Loader2 className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-3" />
-        <p className="text-sm text-gray-500">Carregando aprovacoes...</p>
-      </div>
-    );
-  }
+  if (loading) return <div className="text-center py-12"><Loader2 className="w-8 h-8 text-blue-600 animate-spin mx-auto" /></div>;
 
   if (approvals.length === 0) {
     return (
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-10 text-center">
-        <Inbox className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-        <h3 className="text-base font-semibold text-gray-900 mb-1">Tudo aprovado!</h3>
-        <p className="text-sm text-gray-500">Nenhuma solicitacao pendente no momento.</p>
+      <div className="flex flex-col items-center justify-center py-20 px-6 text-center bg-white rounded-3xl border border-dashed border-gray-200">
+        <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mb-4">
+            <ShieldCheck className="w-8 h-8 text-green-500" />
+        </div>
+        <h3 className="text-lg font-bold text-slate-900">Tudo limpo!</h3>
+        <p className="text-slate-500 mt-2">Você zerou suas pendências de aprovação.</p>
       </div>
     );
   }
 
-  const pendingCount = approvals.filter((approval) => approval.status === "pendente").length;
+  const pendingCount = approvals.filter((a) => a.status === "pendente").length;
 
   return (
     <div className="space-y-4">
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-3xl p-5 text-white shadow-lg">
-        <div className="flex items-center gap-3 mb-2">
-          <ShieldCheck className="w-6 h-6" />
-          <h2 className="text-lg font-bold">Aprovacoes pendentes</h2>
+      {pendingCount > 0 && (
+        <div className="bg-blue-600 rounded-2xl p-4 text-white shadow-lg shadow-blue-600/20 flex items-center gap-3">
+          <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center font-bold">{pendingCount}</div>
+          <div>
+             <p className="font-bold">Pendências</p>
+             <p className="text-xs text-blue-100">Necessitam sua atenção</p>
+          </div>
         </div>
-        <p className="text-sm text-white/80">{pendingCount} solicitacoes aguardando revisao</p>
-      </div>
+      )}
 
       {approvals.map((approval) => {
         const event = approval.evento_id ? eventsMap.get(approval.evento_id) : null;
         const isPending = approval.status === "pendente";
+        
         return (
           <div
             key={approval.id}
-            className={`bg-white rounded-3xl border p-4 shadow-sm transition-all ${
-              isPending ? "border-blue-200 shadow-md" : "border-gray-100"
+            className={`bg-white rounded-3xl p-5 shadow-sm border transition-all ${
+              isPending ? "border-blue-100 ring-4 ring-blue-50/50" : "border-gray-100 opacity-80"
             }`}
           >
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex-1 min-w-0">
-                <h3 className="text-base font-bold text-gray-900 mb-1 truncate">{event?.titulo ?? "Evento"}</h3>
-                <div className="flex items-center gap-2 text-xs text-gray-500">
-                  <span className="font-medium">{approval.tipo === "evento" ? "Evento" : "Orcamento"}</span>
-                  <span>-</span>
-                  <span>{new Date(approval.data_solicitacao).toLocaleDateString("pt-BR")}</span>
-                </div>
-              </div>
-              <span
-                className={`text-xs px-3 py-1 rounded-full font-bold ${
-                  approval.status === "aprovado"
-                    ? "bg-green-100 text-green-700"
-                    : approval.status === "rejeitado"
-                      ? "bg-red-100 text-red-700"
-                      : "bg-yellow-100 text-yellow-700"
-                }`}
-              >
-                {approval.status.charAt(0).toUpperCase() + approval.status.slice(1)}
-              </span>
+            {/* Header Card */}
+            <div className="flex justify-between items-start mb-4">
+               <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                     {approval.tipo === 'orcamento' ? 'Orçamento' : 'Evento'}
+                  </span>
+                  <h3 className="text-lg font-bold text-slate-900 leading-snug">{event?.titulo ?? "Item sem título"}</h3>
+               </div>
+               <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase ${
+                  approval.status === 'aprovado' ? 'bg-green-100 text-green-700' :
+                  approval.status === 'rejeitado' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+               }`}>
+                  {approval.status}
+               </span>
             </div>
 
-            {approval.observacoes ? (
-              <div className="mb-3 p-3 rounded-xl bg-gray-50 border border-gray-100">
-                <p className="text-sm text-gray-700 leading-relaxed">{approval.observacoes}</p>
-              </div>
-            ) : null}
+            <div className="space-y-2 mb-5">
+               <div className="flex items-center gap-2 text-sm text-slate-600 bg-slate-50 p-2 rounded-lg">
+                  <Calendar className="w-4 h-4 text-slate-400" />
+                  <span>Solicitado em {new Date(approval.data_solicitacao).toLocaleDateString("pt-BR")}</span>
+               </div>
+               {approval.observacoes && (
+                  <p className="text-sm text-slate-600 p-3 bg-gray-50 rounded-xl border border-gray-100 italic">
+                     "{approval.observacoes}"
+                  </p>
+               )}
+            </div>
 
+            {/* Actions Area */}
             {isPending ? (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleDecision(approval.id, "aprovado")}
-                  disabled={updatingId === approval.id}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-green-500 hover:bg-green-600 text-white text-sm font-bold disabled:opacity-60 active:scale-95 transition-all shadow-md"
-                >
-                  {updatingId === approval.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                  Aprovar
-                </button>
+              <div className="grid grid-cols-2 gap-3 pt-2">
                 <button
                   onClick={() => handleDecision(approval.id, "rejeitado")}
-                  disabled={updatingId === approval.id}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-bold disabled:opacity-60 active:scale-95 transition-all shadow-md"
+                  disabled={!!updatingId}
+                  className="flex items-center justify-center gap-2 py-3.5 rounded-xl bg-red-50 text-red-600 font-bold active:scale-95 transition-all hover:bg-red-100"
                 >
-                  {updatingId === approval.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
+                  {updatingId === approval.id ? <Loader2 className="w-5 h-5 animate-spin" /> : <X className="w-5 h-5" />}
                   Rejeitar
+                </button>
+                <button
+                  onClick={() => handleDecision(approval.id, "aprovado")}
+                  disabled={!!updatingId}
+                  className="flex items-center justify-center gap-2 py-3.5 rounded-xl bg-green-500 text-white font-bold shadow-lg shadow-green-500/30 active:scale-95 transition-all hover:bg-green-600"
+                >
+                  {updatingId === approval.id ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
+                  Aprovar
                 </button>
               </div>
             ) : (
-              <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded-xl">
-                <Clock className="w-3 h-3" />
-                <span>
-                  Ultima atualizacao em{" "}
-                  {approval.data_resposta
-                    ? new Date(approval.data_resposta).toLocaleDateString("pt-BR")
-                    : new Date(approval.updated_at ?? approval.data_solicitacao).toLocaleDateString("pt-BR")}
-                </span>
-              </div>
+               <div className="flex items-center justify-center gap-2 text-xs text-slate-400 border-t border-gray-100 pt-3">
+                  <Clock className="w-3 h-3" />
+                  Resolvido em {new Date(approval.updated_at).toLocaleDateString("pt-BR")}
+               </div>
             )}
           </div>
         );
